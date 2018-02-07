@@ -5,6 +5,10 @@ import ImageGenerator as ig
 import ReferenceModelDriver
 import matplotlib
 
+# from pprint import pprint
+from skimage import img_as_float
+from skimage import img_as_ubyte
+
 from ReferenceModelDriver import ReferenceModelDriver
 
 matplotlib.use('qt4agg')
@@ -25,24 +29,36 @@ if __name__ == "__main__":
     subImagesFlat = []
 
     for i in range(numImages):
-        # plt.imshow(subImages[i].reshape(28, 28), cmap='Greys')
-        plt.imshow(subImages[i], cmap='Greys')
+        newImg = img_as_ubyte(subImages[i].reshape(28, 28))
+        plt.imshow(newImg, cmap='Greys')
         plt.show()
         # print(generator.discriminate(subImages[i].reshape(784)))
         # subImagesFlat.append(subImages[i].reshape(784))
         # print(refMod.discriminate(subImages[i]))
         #     Tratando as imagens
         # newImg = cv2.resize(subImages[i], (20, 20)).reshape(400)
-        newImg = cv2.resize(subImages[i], (20, 20))
+        newImg = cv2.resize(newImg, (20, 20))
+        # print("newImg.shape-size")
+        # print(newImg.shape)
+        # print(newImg.dtype)
+        # cv2.imwrite(str(i)+".png", newImg)
+        # bkpStr = "img_"+str(i)+".npz"
+        # print("Writing "+bkpStr)
+        # np.savez(bkpStr, newImg=newImg)
 
         # plt.imshow(newImg, cmap='Greys')
         # plt.show()
 
-        newImg = newImg.reshape(400)
+        newImg = np.float32(newImg.reshape(400))
+        # print("\n\nnewImg.shape-dtype")
+        # print(newImg.shape)
+        # print(newImg.dtype)
 
         # newImg = subImages[i].reshape(784)
         subImagesFlat.append(newImg)
-
+    # subImagesFlat = np.asarray(subImagesFlat)
+    print("subImagesFlat.dtype")
+    # print(subImagesFlat.dtype)
     result = refMod.discriminate(np.asarray(subImagesFlat))
 
     print("refMod result:")

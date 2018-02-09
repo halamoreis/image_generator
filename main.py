@@ -21,23 +21,39 @@ if __name__ == "__main__":
     refMod = ReferenceModelDriver()
 
     numImages = 5
-    # subImages = generator.generateSubImage(numImages, 0, 0, reshape=False, convertUChar=False)
-    subImages = generator.generateSubImage(numImages, 0, 0)
+    # Receiving images in the shape 28x28 and 0to1 float format
+    subImages = generator.generateSubImage(numImages, 0, 0, reshape=True, convertUChar=False)
+    # subImages = generator.generateSubImage(numImages, 0, 0)
 
-    # print(subImages.__class__)
+    resultRM = refMod.discriminate28x28(np.asarray(subImages))
+
+    print("refMod result:")
+    print(resultRM)
+    print("   -----   \n\n")
 
     subImagesFlat = []
+    subImagesUint8 = []
 
+    # Iterating the generated images to aply reference model.
     for i in range(numImages):
-        newImg = img_as_ubyte(subImages[i].reshape(28, 28))
-        plt.imshow(newImg, cmap='Greys')
+        # print("newImg.shape-size")
+        # print(subImages[i].shape)
+        # print(subImages[i].dtype)
+        # print(subImages[i][10])
+        plt.imshow(subImages[i], cmap='Greys')
         plt.show()
+
+        # Preparing to aply these images on the full image generator. Converting to uint8.
+        subImagesUint8.append(img_as_ubyte(subImages[i]))
+
         # print(generator.discriminate(subImages[i].reshape(784)))
         # subImagesFlat.append(subImages[i].reshape(784))
         # print(refMod.discriminate(subImages[i]))
         #     Tratando as imagens
         # newImg = cv2.resize(subImages[i], (20, 20)).reshape(400)
-        newImg = cv2.resize(newImg, (20, 20))
+
+        # The RefMod is waiting for 20
+        # newImg = cv2.resize(newImg, (20, 20))
         # print("newImg.shape-size")
         # print(newImg.shape)
         # print(newImg.dtype)
@@ -49,33 +65,34 @@ if __name__ == "__main__":
         # plt.imshow(newImg, cmap='Greys')
         # plt.show()
 
-        newImg = np.float32(newImg.reshape(400))
+        # newImg = np.float32(newImg.reshape(400))
         # print("\n\nnewImg.shape-dtype")
         # print(newImg.shape)
         # print(newImg.dtype)
 
         # newImg = subImages[i].reshape(784)
-        subImagesFlat.append(newImg)
+        # subImagesFlat.append(newImg)
     # subImagesFlat = np.asarray(subImagesFlat)
-    print("subImagesFlat.dtype")
+    # print("subImagesFlat.dtype")
     # print(subImagesFlat.dtype)
-    result = refMod.discriminate(np.asarray(subImagesFlat))
 
-    print("refMod result:")
-    print(result)
-    print(result[0][0])
-    print(result[1][0])
-    print(result[2][0])
-    print(result.shape)
-    print(result.dtype)
-    print(type(result))
-    print("   -----   \n\n")
+
+    """Prepare subImages adding noise."""
+    subImagesUint8 = generator.addNoise(subImagesUint8, -0.3, 0, 0)
+
+    for i in range(numImages):
+        # print("newImg.shape-size")
+        # print(subImages[i].shape)
+        # print(subImages[i].dtype)
+        # print(subImages[i][10])
+        plt.imshow(subImagesUint8[i], cmap='Greys')
+        plt.show()
 
     # Opening the BG image.
-    primaryImage = cv2.imread('./bg/bg2.png')
-
-    fullImage = generator.generateFullImage(subImages, primaryImage)
-
-    plt.imshow(fullImage)
-    plt.show()
+    # primaryImage = cv2.imread('./bg/bg2.png')
+    #
+    # fullImage = generator.generateFullImage(subImagesUint8, primaryImage)
+    #
+    # plt.imshow(fullImage)
+    # plt.show()
 

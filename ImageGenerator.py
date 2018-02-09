@@ -10,7 +10,7 @@ from pycuda.compiler import SourceModule
 import pycuda.autoinit
 
 import numpy as np
-# import cv2
+import cv2 as cv
 
 from skimage import img_as_ubyte
 from tensorflow.examples.tutorials.mnist import input_data
@@ -48,6 +48,30 @@ class ImageGenerator:
             //part[id] = blockDim.y;
       }
       """
+
+    kernelBright_code = """
+      __global__ void printPart(unsigned char *bg, unsigned char *part, long int *offsets, unsigned char *lineSize)
+      {
+            int imgOffset = 100, indexOffset = 28*28;
+                                                // Number of offsets
+            int offsetx = offsets[blockIdx.x];
+            int offsety = offsets[blockIdx.x + 4];
+            int id = (threadIdx.x + offsetx) + ((threadIdx.y+offsety) * 1024);
+            int valPart = part[(threadIdx.x + threadIdx.y * blockDim.y) + (indexOffset * blockIdx.x)];
+
+            valPart != 0 ? bg[id*3] = (bg[id] * 0.3) + (valPart * 0.7) + 0: 0;
+            valPart != 0 ? bg[(id*3)+1] = (bg[id] * 0.3) + (valPart * 0.7) + 0: 0;
+            valPart != 0 ? bg[(id*3)+2] = (bg[id] * 0.3) + (valPart * 0.7) + 0: 0;
+
+
+
+
+            // bg[id] = blockDim.x-15;
+            //bg[id] = threadIdx.x + (threadIdx.y * blockDim.y);
+            //part[id] = blockDim.y;
+      }
+      """
+
     # def __init__(self):
 
     """Defining the basic CNN architecture of the Generator"""
@@ -182,16 +206,19 @@ class ImageGenerator:
                 # print("Generated result")
                 # print(result)
 
-                if (reshape and convertUChar):
+                if (reshape):
                     # new_samples.append(img_as_ubyte(gen_sample.reshape(28, 28)))
-                    new_samples.append(gen_sample.reshape(28, 28))
-                else:
-                    new_samples.append(gen_sample)
+                    gen_sample = gen_sample.reshape(28, 28)
+                if (convertUChar):
+                    gen_sample = img_as_ubyte(gen_sample)
+
+                new_samples.append(gen_sample)
 
 
             # result, logits = sess.run(self.__innerDiscriminator(new_samples, reuse=True), feed_dict={image_ph: images})
         return new_samples
 
+    """Receiving a list of (sub)images, with each in the 28x28 shape and in uint8 format."""
     def generateFullImage(self, subImages, bgImage):
         numSubImages = len(subImages)
 
@@ -244,4 +271,41 @@ class ImageGenerator:
         print(offsetArray)
 
         return completeImage_host
+    """Adiciona ruídos às imagens submetidas.
+        - resize = float value from -0.5 to 0.5
+        - bright = 
+        - contrast = 
+    """
+    def addNoise(self, images, resize, brightness, contrast):
+        print("\nInitial image shape: ")
+        print(images[0].shape)
 
+        oldSize = images[0][0].shape[0]
+        # Calculating the new size
+        if(resize > 0):
+        #     First image as model for shape
+            print("Aumento")
+            newSize = int(oldSize * (resize+1))
+        else:
+            print("Diminui")
+            newSize = oldSize - int(oldSize * (resize*-1))
+
+        print("New size: "+str(newSize))
+
+        newImgList = []
+        for i in range(len(images)):
+            newImg = cv.resize(images[i], (newSize, newSize))
+
+            # Crop to the old image size
+            if(newSize > oldSize):
+                startLine = startCol = int((newSize - oldSize)/2)
+                endLine = endCol = startCol + oldSize
+                newImg = newImg[startLine:endLine, startCol:endCol]
+            else:
+                startLine = startCol = int((newSize - oldSize)/2)
+                endLine = endCol = startCol - oldSize - startCol
+                newImg[startLine:endLine*-1, startCol:endCol*-1] = newImg
+
+            images[i] = newImg
+            # newImgList.append(newImg)
+        return images

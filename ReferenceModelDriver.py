@@ -84,7 +84,7 @@ class ReferenceModelDriver():
         print("\nInitialized.\n\n")
 
     """Awaiting for 28x28 images to be discriminated by selected Reference Model."""
-    def discriminate28x28(self, images):
+    def discriminate28x28(self, images, uintType=False):
         # print(image.shape)
         # image = image.reshape(784)
         # print(image.shape)
@@ -105,7 +105,10 @@ class ReferenceModelDriver():
         for i in range(images.shape[0]):
             imgAux = images[i]
             # Resizing and forcing cast to float32
-            imgAux = np.float32(img_as_ubyte(imgAux))
+            if(uintType):
+                imgAux = np.float32(imgAux)
+            else:
+                imgAux = np.float32(img_as_ubyte(imgAux))
             imgAux = cv.resize(imgAux, (20, 20))
             newList.append(imgAux.reshape(400))
 

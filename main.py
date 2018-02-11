@@ -76,9 +76,52 @@ if __name__ == "__main__":
     # print("subImagesFlat.dtype")
     # print(subImagesFlat.dtype)
 
+    siarray = np.asarray(subImagesUint8)
 
     """Prepare subImages adding noise."""
-    subImagesUint8 = generator.addNoise(subImagesUint8, -0.3, 0, 0)
+    subImagesUint8 = generator.addNoise(siarray, -0.4, 0, 0, 0)
+    # newList = []
+
+    resultRM = refMod.discriminate28x28(siarray, uintType=True)
+
+    print("refMod result:")
+    print(resultRM)
+    print("   -----   \n\n")
+
+    # for i in range(numImages):
+        # plt.imshow(subImagesUint8[i], cmap='Greys')
+        # plt.show()
+        # newList.append(subImagesUint8[i])
+
+    # newArray = np.asarray(newList)
+    siarray = np.asarray(subImagesUint8)
+
+
+    """Prepare subImages adding more noise."""
+    subImagesUint8 = generator.addNoise(siarray, 0, 35, 0, 0)
+
+    resultRM = refMod.discriminate28x28(siarray, uintType=True)
+
+    print("refMod result:")
+    print(resultRM)
+    print("   -----   \n\n")
+
+    # for i in range(numImages):
+        # print("newImg.shape-size")
+        # print(subImages[i].shape)
+        # print(subImages[i].dtype)
+        # print(subImages[i][10])
+        # plt.imshow(subImagesUint8[i], cmap='Greys')
+        # plt.show()
+
+    """Prepare subImages adding more noise."""
+    subImagesUint8 = generator.addNoise(subImagesUint8, 0, 0, 20, 1.5)
+
+    resultRM = refMod.discriminate28x28(np.asarray(subImagesUint8), uintType=True)
+
+    print("refMod result:")
+    print(resultRM)
+    print("   -----   \n\n")
 
     for i in range(numImages):
         # print("newImg.shape-size")

@@ -276,36 +276,69 @@ class ImageGenerator:
         - bright = 
         - contrast = 
     """
-    def addNoise(self, images, resize, brightness, contrast):
-        print("\nInitial image shape: ")
-        print(images[0].shape)
+    def addNoise(self, images, resize, rotate, brightness, contrast):
+        # First image as model for shape
+        rows, cols = images[0].shape
 
-        oldSize = images[0][0].shape[0]
-        # Calculating the new size
-        if(resize > 0):
-        #     First image as model for shape
-            print("Aumento")
-            newSize = int(oldSize * (resize+1))
-        else:
-            print("Diminui")
-            newSize = oldSize - int(oldSize * (resize*-1))
+        numImages = len(images)
 
-        print("New size: "+str(newSize))
+        if(resize != 0):
+            print("\nInitial image shape: ")
+            print(images[0].shape)
 
-        newImgList = []
-        for i in range(len(images)):
-            newImg = cv.resize(images[i], (newSize, newSize))
-
-            # Crop to the old image size
-            if(newSize > oldSize):
-                startLine = startCol = int((newSize - oldSize)/2)
-                endLine = endCol = startCol + oldSize
-                newImg = newImg[startLine:endLine, startCol:endCol]
+            oldSize = images[0][0].shape[0]
+            # Calculating the new size
+            if(resize > 0):
+            #     First image as model for shape
+                print("Aumento")
+                newSize = int(oldSize * (resize+1))
             else:
-                startLine = startCol = int((newSize - oldSize)/2)
-                endLine = endCol = startCol - oldSize - startCol
-                newImg[startLine:endLine*-1, startCol:endCol*-1] = newImg
+                print("Diminui")
+                newSize = oldSize - int(oldSize * (resize*-1))
 
-            images[i] = newImg
-            # newImgList.append(newImg)
+            print("New size: "+str(newSize))
+
+            newImgList = []
+            for i in range(numImages):
+                newImg = cv.resize(images[i], (newSize, newSize))
+
+                # Crop to the old image size
+                if(newSize > oldSize):
+                    startLine = startCol = int((newSize - oldSize)/2)
+                    endLine = endCol = startCol + oldSize
+                    newImg = newImg[startLine:endLine, startCol:endCol]
+                else:
+                    startLine = startCol = int((oldSize - newSize)/2)
+                    endLine = endCol = (oldSize - newSize - startCol) * -1
+                    # print("\nParams: ")
+                    # print(str(startLine) + ':' + str(endLine) + " - " + str(startCol) + ":" + str(endCol))
+                    zeroMatrix = np.zeros((oldSize, oldSize))
+                    zeroMatrix[startLine:endLine, startCol:endCol] = newImg
+                    newImg = zeroMatrix
+
+                images[i] = newImg
+
+        if(rotate != 0):
+            M = cv.getRotationMatrix2D((cols/2, rows/2), rotate, 1)
+            i = 0
+            for img in images:
+                # img = cv.warpAffine(img, M, (cols, rows))
+                newImg = cv.warpAffine(img, M, (cols, rows))
+                images[i] = newImg
+                i += 1
+
+        if(brightness != 0 or contrast != 0):
+            print("Brightness in")
+            print(images[0].dtype)
+            print(images[0][18])
+            print(images[0][19])
+
+            for i in range(len(images)):
+                images[i] = cv.add(images[i], brightness)
+                images[i] = cv.multiply(images[i], contrast)
+
+            print("Post processing")
+            print(images[0][18])
+            print(images[0][19])
+
         return images

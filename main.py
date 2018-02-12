@@ -25,7 +25,13 @@ if __name__ == "__main__":
     subImages = generator.generateSubImage(numImages, 0, 0, reshape=True, convertUChar=False)
     # subImages = generator.generateSubImage(numImages, 0, 0)
 
-    resultRM = refMod.discriminate28x28(np.asarray(subImages))
+    resultRM = refMod.discriminateKNN28x28(np.asarray(subImages))
+
+    print("refMod result:")
+    print(resultRM)
+    print("   -----   \n\n")
+
+    resultRM = refMod.discriminateSVM28x28(subImages)
 
     print("refMod result:")
     print(resultRM)
@@ -75,6 +81,7 @@ if __name__ == "__main__":
     # subImagesFlat = np.asarray(subImagesFlat)
     # print("subImagesFlat.dtype")
     # print(subImagesFlat.dtype)
+    exit(0)
 
     siarray = np.asarray(subImagesUint8)
 
@@ -82,7 +89,7 @@ if __name__ == "__main__":
     subImagesUint8 = generator.addNoise(siarray, -0.4, 0, 0, 0)
     # newList = []
 
-    resultRM = refMod.discriminate28x28(siarray, uintType=True)
+    resultRM = refMod.discriminateKNN28x28(siarray, uintType=True)
 
     print("refMod result:")
     print(resultRM)
@@ -100,7 +107,7 @@ if __name__ == "__main__":
     """Prepare subImages adding more noise."""
     subImagesUint8 = generator.addNoise(siarray, 0, 35, 0, 0)
 
-    resultRM = refMod.discriminate28x28(siarray, uintType=True)
+    resultRM = refMod.discriminateKNN28x28(siarray, uintType=True)
 
     print("refMod result:")
     print(resultRM)
@@ -117,7 +124,7 @@ if __name__ == "__main__":
     """Prepare subImages adding more noise."""
     subImagesUint8 = generator.addNoise(subImagesUint8, 0, 0, 20, 1.5)
 
-    resultRM = refMod.discriminate28x28(np.asarray(subImagesUint8), uintType=True)
+    resultRM = refMod.discriminateKNN28x28(np.asarray(subImagesUint8), uintType=True)
 
     print("refMod result:")
     print(resultRM)

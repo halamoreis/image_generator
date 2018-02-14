@@ -13,6 +13,7 @@ import numpy as np
 import cv2 as cv
 
 from skimage import img_as_ubyte
+from skimage import img_as_float
 from tensorflow.examples.tutorials.mnist import input_data
 
 
@@ -83,14 +84,14 @@ class ImageGenerator:
         real_images = tf.placeholder(tf.float32, shape=[None, 784])
         z = tf.placeholder(tf.float32, shape=[None, 100])
         # print(z.type)
-        print("z é")
-        print(type(z))
+        # print("z é")
+        # print(type(z))
 
         # Generator
         G = self.__innerSubGenerator(z)
         # print(G.type)
-        print("G é")
-        print(type(G))
+        # print("G é")
+        # print(type(G))
 
         D_output_real, D_logits_real = self.__innerDiscriminator(real_images, None)
         D_output_fake, D_logits_fake = self.__innerDiscriminator(G, True)
@@ -143,10 +144,10 @@ class ImageGenerator:
     def discriminate(self, images):
         # image = np.array([1, 784], dtype=np.float64)
         images = np.asarray(images)
-        print("Dados em Discriminate:")
-        print(images.shape)
-        print(images.dtype)
-        print(images.size)
+        # print("Dados em Discriminate:")
+        # print(images.shape)
+        # print(images.dtype)
+        # print(images.size)
         # image_ph = tf.placeholder(tf.float32, shape=[None, 784])
         with tf.Session() as sess:
             self.saver.restore(sess, self.TRAINED_MODEL_DIR)
@@ -272,6 +273,7 @@ class ImageGenerator:
 
         return completeImage_host
     """Adiciona ruídos às imagens submetidas.
+        Expects an image in a 2 dimensional array
         - resize = float value from -0.5 to 0.5
         - bright = 
         - contrast = 
@@ -283,38 +285,42 @@ class ImageGenerator:
         numImages = len(images)
 
         if(resize != 0):
-            print("\nInitial image shape: ")
-            print(images[0].shape)
+            # print("\nInitial image shape: ")
+            # print(images[0].shape)
 
             oldSize = images[0][0].shape[0]
             # Calculating the new size
             if(resize > 0):
-            #     First image as model for shape
-                print("Aumento")
+                #     First image as model for shape
+                #     print("Aumento")
                 newSize = int(oldSize * (resize+1))
             else:
-                print("Diminui")
+                # print("Diminui")
                 newSize = oldSize - int(oldSize * (resize*-1))
 
-            print("New size: "+str(newSize))
+            # print("New size: "+str(newSize))
+
 
             newImgList = []
             for i in range(numImages):
-                newImg = cv.resize(images[i], (newSize, newSize))
-
-                # Crop to the old image size
-                if(newSize > oldSize):
-                    startLine = startCol = int((newSize - oldSize)/2)
-                    endLine = endCol = startCol + oldSize
-                    newImg = newImg[startLine:endLine, startCol:endCol]
+                if (newSize == oldSize):
+                    newImg = images[i]
                 else:
-                    startLine = startCol = int((oldSize - newSize)/2)
-                    endLine = endCol = (oldSize - newSize - startCol) * -1
-                    # print("\nParams: ")
-                    # print(str(startLine) + ':' + str(endLine) + " - " + str(startCol) + ":" + str(endCol))
-                    zeroMatrix = np.zeros((oldSize, oldSize))
-                    zeroMatrix[startLine:endLine, startCol:endCol] = newImg
-                    newImg = zeroMatrix
+                    newImg = cv.resize(images[i], (newSize, newSize))
+
+                    # Crop to the old image size
+                    if(newSize > oldSize):
+                        startLine = startCol = int((newSize - oldSize)/2)
+                        endLine = endCol = startCol + oldSize
+                        newImg = newImg[startLine:endLine, startCol:endCol]
+                    else:
+                        startLine = startCol = int((oldSize - newSize)/2)
+                        endLine = endCol = (oldSize - newSize - startCol) * -1
+                        # print("\nParams: ")
+                        # print(str(startLine) + ':' + str(endLine) + " - " + str(startCol) + ":" + str(endCol))
+                        zeroMatrix = np.zeros((oldSize, oldSize))
+                        zeroMatrix[startLine:endLine, startCol:endCol] = newImg
+                        newImg = zeroMatrix
 
                 images[i] = newImg
 
@@ -328,17 +334,21 @@ class ImageGenerator:
                 i += 1
 
         if(brightness != 0 or contrast != 0):
-            print("Brightness in")
-            print(images[0].dtype)
-            print(images[0][18])
-            print(images[0][19])
+            # print("Brightness in")
+            # print(images[0].dtype)
+            # print(images[0][18])
+            # print(images[0][19])
+            if(images[0].dtype == np.float):
+                print("Float!")
 
             for i in range(len(images)):
-                images[i] = cv.add(images[i], brightness)
-                images[i] = cv.multiply(images[i], contrast)
+                # TODO Gamb convertendo para uint8 e depois retornando para float
+                imgTemp = img_as_ubyte(images[i])
+                imgTemp = cv.add(imgTemp, brightness)
+                images[i] = img_as_float(cv.multiply(imgTemp, contrast))
 
-            print("Post processing")
-            print(images[0][18])
-            print(images[0][19])
+            # print("Post processing")
+            # print(images[0][18])
+            # print(images[0][19])
 
         return images

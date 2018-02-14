@@ -162,11 +162,23 @@ class ReferenceModelDriver():
 
         # images = image
 
+        if (images[0].shape[0] == 28):
+            doImgShape = True
+        else:
+            doImgShape = False
+
         newList = []
         # Preventing issues with bad data format.
         # print("images.size " + str(images.shape[0]))
         for i in range(images.shape[0]):
-            imgAux = images[i]
+            # Test if already reshaped
+            if(not doImgShape):
+                imgAux = images[i].reshape(28, 28)
+            else:
+                imgAux = images[i]
+            # print("In KNN discriminator")
+            # plt.imshow(imgAux, cmap='Greys')
+            # plt.show()
             # Resizing and forcing cast to float32
             if(uintType):
                 imgAux = np.float32(imgAux)
@@ -202,19 +214,31 @@ class ReferenceModelDriver():
 
         # images = image
         # print("images.size " + str(images.shape[0]))
+        if (images[0].shape[0] == 28):
+            doImgShape = True
+        else:
+            doImgShape = False
 
         newList = []
         # Preventing issues with bad data format.
         for i in range(len(images)):
-            imgAux = images[i]
-            # Resizing and forcing cast to float32
-            if(uintType):
-                imgAux = np.float32(imgAux)
+            if (not doImgShape):
+                imgAux = images[i].reshape(28, 28)
             else:
-                imgAux = np.float32(img_as_ubyte(imgAux))
+                imgAux = images[i]
+            # plt.imshow(imgAux, cmap='Greys')
+            # plt.show()
+            # Resizing and forcing cast to float32
+            if(not uintType):
+                # print("Converting to uint8")
+                imgAux = np.uint8(img_as_ubyte(imgAux))
             imgAux = cv.resize(imgAux, (20, 20))
             newList.append(imgAux)
 
+        # plt.imshow(newList[0], cmap='Greys')
+        # plt.show()
+        # print("In discriminateSVM method...")
+        # print(newList[0])
         otherList = []
         otherList.append(newList)
         deskewed = [list(map(self.deskew, row)) for row in otherList]

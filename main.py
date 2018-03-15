@@ -20,21 +20,25 @@ if __name__ == "__main__":
     generator = ig.ImageGenerator()
     refMod = ReferenceModelDriver()
 
-    numImages = 5
+    numImages = 15
     # Receiving images in the shape 28x28 and 0to1 float format
-    subImages = generator.generateSubImage(numImages, 0, 0, reshape=True, convertUChar=False)
+    subImages, reliability = generator.generateSubImage(numImages, 0, 0, reshape=True, convertUChar=False)
     # subImages = generator.generateSubImage(numImages, 0, 0)
 
-    resultRM = refMod.discriminateKNN28x28(np.asarray(subImages))
+    resultKNN = refMod.discriminateKNN28x28(np.asarray(subImages))
 
     print("refMod result:")
-    print(resultRM)
+    print(resultKNN)
     print("   -----   \n\n")
 
-    resultRM = refMod.discriminateSVM28x28(subImages)
+    resultSVM = refMod.discriminateSVM28x28(subImages)
 
     print("refMod result:")
-    print(resultRM)
+    print(resultSVM)
+    print("   -----   \n\n")
+
+    print("Reliability:")
+    print(reliability)
     print("   -----   \n\n")
 
     subImagesFlat = []
@@ -46,24 +50,30 @@ if __name__ == "__main__":
         # print(subImages[i].shape)
         # print(subImages[i].dtype)
         # print(subImages[i][10])
-        plt.imshow(subImages[i], cmap='Greys')
-        plt.show()
+
 
         # Preparing to aply these images on the full image generator. Converting to uint8.
         subImagesUint8.append(img_as_ubyte(subImages[i]))
 
-        # print(generator.discriminate(subImages[i].reshape(784)))
+        print(subImages[i].dtype)
+        print(type(subImages[i]))
+        # print("Discriminator says:")
+        # print(generator.discriminate([subImages[i].reshape(784)]))
         # subImagesFlat.append(subImages[i].reshape(784))
         # print(refMod.discriminate(subImages[i]))
         #     Tratando as imagens
         # newImg = cv2.resize(subImages[i], (20, 20)).reshape(400)
 
+        plt.imshow(subImages[i], cmap='Greys')
+        plt.show()
+
+        cv2.imwrite("syn-img/"+str(i).zfill(3)+"_"+str(reliability[i])+" "+str(resultSVM[i])+"-"+str(resultKNN[i])+".png", img_as_ubyte(subImages[i]))
         # The RefMod is waiting for 20
         # newImg = cv2.resize(newImg, (20, 20))
         # print("newImg.shape-size")
         # print(newImg.shape)
         # print(newImg.dtype)
-        # cv2.imwrite(str(i)+".png", newImg)
+
         # bkpStr = "img_"+str(i)+".npz"
         # print("Writing "+bkpStr)
         # np.savez(bkpStr, newImg=newImg)

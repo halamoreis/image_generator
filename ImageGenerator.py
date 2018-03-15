@@ -148,23 +148,48 @@ class ImageGenerator:
         # print(images.shape)
         # print(images.dtype)
         # print(images.size)
-        # image_ph = tf.placeholder(tf.float32, shape=[None, 784])
+        image_ph = tf.placeholder(tf.float32, shape=[None, 784])
+        init = tf.global_variables_initializer()
         with tf.Session() as sess:
             self.saver.restore(sess, self.TRAINED_MODEL_DIR)
 
-            # result, logits = sess.run(self.__innerDiscriminator(image_ph, reuse=True), feed_dict={image_ph: images})
-            result, logits = sess.run(self.__innerDiscriminator(images, reuse=True))
+            sess.run(init)
+            result, logits = sess.run(self.__innerDiscriminator(image_ph, reuse=tf.AUTO_REUSE), feed_dict={image_ph: images})
+            # result, logits = sess.run(self.__innerDiscriminator(images, reuse=True))
+        # print "\nResult is"
+        # print type(result)
+        # print result
+        # print "\nLogits is"
+        # print type(logits)
+        # print logits
+
         return result
 
 
-    def generateSubImage(self, numImages, resolutionSubImage, imageType, reshape=True, convertUChar=True):
+    """ Generate single images of the selected image type database.
+    Args:
+        numImages (int): The number of images which is wanted.
+        resolutionSubImage (int): The resolution of each image in integer value from 0 to 3. 0 means 20x20, 1=28x28,
+        2=32x32 and 3=48x48.
+        imageType (int): The second parameter.
+        reshape (bool): If the image wil.
+        convertUChar (bool): If the dtype of the numpy array have to be converted to uint8. Otherwise the array will be
+        float.
 
-        # Selecting the resolution index, 28x28, 32x32 and 48x48.
+    Returns:
+        bool: The return value. True for success, False otherwise.
+
+    """
+    def  generateSubImage(self, numImages, resolutionSubImage, imageType, reshape=True, convertUChar=True):
+
+        # Selecting the resolution index, 20x20, 28x28, 32x32 and 48x48.
         if (resolutionSubImage == 0):
-            self.resolution = 28
+            self.resolution = 20
         elif (resolutionSubImage == 1):
-            self.resolution = 32
+            self.resolution = 28
         elif (resolutionSubImage == 2):
+            self.resolution = 32
+        elif (resolutionSubImage == 3):
             self.resolution = 48
 
         # Selecting the type of the primary image dataset.
@@ -177,14 +202,14 @@ class ImageGenerator:
 
         # mnistDataSet = input_data.read_data_sets(self.MNIST_DIR, one_hot=True)
 
-
-
-
         new_samples = []
 
         # Creating the TF placeholder
         z = tf.placeholder(tf.float32, shape=[None, 100])
         ipt = tf.placeholder(tf.float32, shape=[None, 784])
+        image_ph = tf.placeholder(tf.float32, shape=[None, 784])
+
+        init = tf.global_variables_initializer()
 
         with tf.Session() as sess:
             self.saver.restore(sess, self.TRAINED_MODEL_DIR)
@@ -193,19 +218,21 @@ class ImageGenerator:
                 sample_z = np.random.uniform(-1, 1, size=(1, 100))
 
                 gen_sample = sess.run(self.__innerSubGenerator(z, reuse=True), feed_dict={z: sample_z})
+
+
                 # gen_sample = sess.run(generator(z, reuse=True), feed_dict={z: imgList[x].reshape(1, 100)})
                 # Test
                 # list1 = [gen_sample]
                 # list1 = np.asarray(gen_sample)
                 # print("list1")
                 # print(list1.shape)
-                # init = tf.global_variables_initializer()
-                # sess.run(init)
                 # # Discriminating
                 # result, logits = sess.run(self.__innerDiscriminator(ipt.initialized_value(), reuse=True)
                 #                                                                 , feed_dict={ipt: list1})
                 # print("Generated result")
                 # print(result)
+
+                # normalShape =
 
                 if (reshape):
                     # new_samples.append(img_as_ubyte(gen_sample.reshape(28, 28)))
@@ -215,9 +242,12 @@ class ImageGenerator:
 
                 new_samples.append(gen_sample)
 
+            sess.run(init)
+            # Getting the reliability
+            gen_reliability, dis_logits = sess.run(self.__innerDiscriminator(image_ph, reuse=tf.AUTO_REUSE), feed_dict={image_ph: np.asarray(new_samples).reshape([-1, 784])})
 
             # result, logits = sess.run(self.__innerDiscriminator(new_samples, reuse=True), feed_dict={image_ph: images})
-        return new_samples
+        return new_samples, gen_reliability
 
     """Receiving a list of (sub)images, with each in the 28x28 shape and in uint8 format."""
     def generateFullImage(self, subImages, bgImage):
@@ -272,6 +302,8 @@ class ImageGenerator:
         print(offsetArray)
 
         return completeImage_host
+
+
     """Adiciona ruídos às imagens submetidas.
         Expects an image in a 2 dimensional array
         - resize = float value from -0.5 to 0.5
@@ -350,5 +382,115 @@ class ImageGenerator:
             # print("Post processing")
             # print(images[0][18])
             # print(images[0][19])
+
+        return images
+
+
+    """Add noise with variated parameter to images.
+        Expects a list of images (in a 2 dimensional array of int) and the list of params
+        (with the same length as the list of images). 
+        - resize = float value from -0.5 to 0.5
+        - rotate = 
+        - bright = 
+        - contrast = 
+    """
+    def addNoiseToLists(self, images, resizeParams, rotateParams, brightnessParams, contrastParams):
+        print("Resize: " + str(resizeParams[0]) + ", " + str(resizeParams[49]))
+        print("Rotate: " + str(rotateParams[0]) + ", " + str(rotateParams[49]))
+        print("Bright: " + str(brightnessParams[0]) + ", " + str(brightnessParams[49]))
+        print("Contrast: " + str(contrastParams[0]) + ", " + str(contrastParams[49]))
+        print("---------------------------------")
+        # First image as model for shape
+        rows, cols = images[0].shape
+
+        numImages = len(images)
+        print("NumImages "+str(numImages))
+
+        for i in range(numImages):
+            # print("Index: "+str(i))
+            # print(images[i].dtype)
+
+            """ RESIZING """
+            if(resizeParams[i] != 0):
+                # print("\nInitial image shape: ")
+                # print(images[0].shape)
+
+                oldSize = images[i][0].shape[0]
+                # Calculating the new size
+                if(resizeParams[i] > 0):
+                    #     First image as model for shape
+                    #     print("Aumento")
+                    newSize = int(oldSize * (resizeParams[i]+1))
+                else:
+                    # print("Diminui")
+                    newSize = oldSize - int(oldSize * (resizeParams[i]*-1))
+
+                # print("New size: "+str(newSize))
+
+
+                # newImgList = []
+                # for i in range(numImages):
+
+                if (newSize == oldSize):
+                    newImg = images[i]
+                else:
+                    # newImg = img_as_ubyte(cv.resize(images[i], (newSize, newSize), newImg))
+                    newImg = np.zeros((newSize, newSize), dtype=np.uint8)
+                    cv.resize(images[i], dsize=(newSize, newSize), dst=newImg)
+
+                    # Crop to the old image size
+                    if(newSize > oldSize):
+                        startLine = startCol = int((newSize - oldSize)/2)
+                        endLine = endCol = startCol + oldSize
+                        newImg = newImg[startLine:endLine, startCol:endCol]
+                    else:
+                        startLine = startCol = int((oldSize - newSize)/2)
+                        endLine = endCol = (oldSize - newSize - startCol) * -1
+                        # print("\nParams: ")
+                        # print(str(startLine) + ':' + str(endLine) + " - " + str(startCol) + ":" + str(endCol))
+                        zeroMatrix = np.zeros((oldSize, oldSize), dtype=np.uint8)
+                        zeroMatrix[startLine:endLine, startCol:endCol] = newImg
+                        newImg = zeroMatrix
+
+                images[i] = newImg
+                # print("\n\nResized")
+                # print(images[i].dtype)
+                # print(images[i])
+
+            """ --- ROTATING ---"""
+            # Applying the rotate param
+            if(rotateParams[i] != 0):
+                M = cv.getRotationMatrix2D((cols/2, rows/2), rotateParams[i], 1)
+
+                # img = cv.warpAffine(img, M, (cols, rows))
+                newImg = cv.warpAffine(images[i], M, (cols, rows))
+                images[i] = newImg
+                # print(images[i].dtype)
+
+
+            # Applying the brightness and contrast params
+            if(brightnessParams[i] != 0 or contrastParams[i] != 0):
+                # print("Brightness in")
+                # print(images[0].dtype)
+                # print(images[0][18])
+                # print(images[0][19])
+                # print(type(images[i]))
+                if(images[i].dtype == np.float):
+                    print("Float!")
+                    print(images[i])
+                    exit(0)
+
+                # for i in range(len(images)):
+                # print(images[i])
+                # print(type(images[i]))
+                # print(images[i].dtype)
+                # imgTemp = img_as_ubyte(images[i])
+                # imgTemp = cv.add(imgTemp, brightnessParams[i])
+                imgTemp = cv.add(images[i], brightnessParams[i])
+                # images[i] = img_as_float(cv.multiply(imgTemp, contrastParams[i]))
+                images[i] = cv.multiply(imgTemp, contrastParams[i])
+
+                # print("Post processing")
+                # print(images[0][18])
 
         return images

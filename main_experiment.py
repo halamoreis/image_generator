@@ -18,11 +18,14 @@ import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
+    # Verbose mod flags
+    showParams = False
+
     generator = ig.ImageGenerator()
     refMod = ReferenceModelDriver()
 
-    numImages = 500
-    numCalibrationImages = 500
+    # numImages = 50
+    numCalibrationImages = 100
     # Receiving images in the shape 28x28 and 0to1 float format
     # subImages = generator.generateSubImage(numImages, 0, 0, reshape=True, convertUChar=False)
 
@@ -62,21 +65,21 @@ if __name__ == "__main__":
     calibrateSetLabels = np.asarray(newList)
 
     resultKNN = np.asarray(resultKNN, dtype=np.int)
-    resultKNN = resultKNN.reshape(numImages)
+    resultKNN = resultKNN.reshape(numCalibrationImages)
     resultSVM = np.asarray(resultSVM, dtype=np.int)
-    resultSVM = resultSVM.reshape(numImages)
-    calibrateSetLabels = calibrateSetLabels.reshape(numImages)
+    resultSVM = resultSVM.reshape(numCalibrationImages)
+    calibrateSetLabels = calibrateSetLabels.reshape(numCalibrationImages)
 
     maskKNN = resultKNN == calibrateSetLabels
     maskSVM = resultSVM == calibrateSetLabels
 
-    print("\nKNN Accuracy:")
+    print("\nKNN Initial MNIST Accuracy:")
     correct = np.count_nonzero(maskKNN)
     print(correct * 100.0 / resultKNN.size)
 
-    print("\nSVM Accuracy:")
+    print("\nSVM Initial MNIST Accuracy:")
     correct = np.count_nonzero(maskSVM)
-    print(correct * 100.0 / maskSVM.size)
+    print(correct * 100.0 / resultSVM.size)
 
     # print("test labels")
     # print(calibrateSetLabels.shape)
@@ -117,7 +120,7 @@ if __name__ == "__main__":
 
     """ Initial boundaries values """
 
-    resizeIni = (-0.7, 0.8)
+    resizeIni = (-0.3, 0.6)
     rotateIni = (5, 60)
     brightnessIni = (-100, 70)
     contrastIni = (1.1, 3)
@@ -145,6 +148,7 @@ if __name__ == "__main__":
         fakeList.append(calibrateSet28x28[i])
         newImage = generator.addNoise(fakeList, resizeParams[i], 0, 0, 0)
         newImagesList.append(newImage)
+
     calibrateSetArray = np.asarray(newImagesList)
     resultKNN = refMod.discriminateKNN28x28(calibrateSetArray)
     resultSVM = refMod.discriminateSVM28x28(calibrateSetArray)
@@ -175,8 +179,9 @@ if __name__ == "__main__":
 
     # Update the new calibrated boundaries
     resizeCalibrated = (newMin, newMax)
-    print("New boundaries for resize:")
-    # print(resizeCalibrated)
+    if (showParams):
+        print("New boundaries for resize:")
+        print(resizeCalibrated)
 
     print("\n\nCalibrating rotate param...")
     # Calibrating resize params
@@ -218,8 +223,9 @@ if __name__ == "__main__":
 
     # Update the new calibrated boundaries
     rotateCalibrated = (newMin, newMax)
-    print("New boundaries for rotate:")
-    print(rotateCalibrated)
+    if (showParams):
+        print("New boundaries for rotate:")
+        print(rotateCalibrated)
 
     print("\n\nCalibrating brightness and contrast params...")
     # Calibrating resize params
@@ -269,13 +275,19 @@ if __name__ == "__main__":
     # Update the new calibrated boundaries
     brightCalibrated = (newMinb, newMaxb)
     contrastCalibrated = (newMinc, newMaxc)
-    print("New boundaries for brightness and contrast:")
-    print(brightCalibrated)
-    print(contrastCalibrated)
+    if(showParams):
+        print("New boundaries for brightness and contrast:")
+        print(brightCalibrated)
+        print(contrastCalibrated)
 
-
-
-
+    print("---------------------------------")
+    print("\n\n----  Calibration Complete!  ----\n\n")
+    print("Calibrated values: ")
+    print("Resize: "+str(resizeCalibrated[0])+", "+str(resizeCalibrated[1]))
+    print("Rotate: "+str(rotateCalibrated[0])+", "+str(rotateCalibrated[1]))
+    print("Bright: "+str(brightCalibrated[0])+", "+str(brightCalibrated[1]))
+    print("Contrast: "+str(contrastCalibrated[0])+", "+str(contrastCalibrated[1]))
+    print("---------------------------------")
     """"""
     ####################################################
     #
@@ -283,7 +295,7 @@ if __name__ == "__main__":
     """"""
 
     # Getting the image test set and the corresponding labels
-    numTestImages = 200
+    numTestImages = 2500
     numResizedImages = int(numTestImages / 4)
     numRotatedImages = int(numTestImages / 4)
     numBCImages = int(numTestImages / 4)
@@ -312,10 +324,12 @@ if __name__ == "__main__":
     labelsRR = testLabels[indexIni:indexEnd]
 
     """ Generating new values for noise generation to run the verification trial """
-    resizeParams = np.linspace(resizeCalibrated[0], resizeCalibrated[1], numResizedImages)
-    rotateParams = np.linspace(rotateCalibrated[0], rotateCalibrated[1], numRotatedImages)
-    brightnessParams = np.linspace(brightCalibrated[0], brightCalibrated[1], numBCImages)
-    contrastParams = np.linspace(contrastCalibrated[0], contrastCalibrated[1], numBCImages)
+    # resizeParams = np.linspace(resizeCalibrated[0], resizeCalibrated[1], numResizedImages)
+    resizeParams = np.random.uniform(resizeCalibrated[0], resizeCalibrated[1], numResizedImages)
+    # rotateParams = np.linspace(rotateCalibrated[0], rotateCalibrated[1], numRotatedImages)
+    rotateParams = np.random.randint(rotateCalibrated[0], rotateCalibrated[1], numRotatedImages)
+    brightnessParams = np.random.randint(brightCalibrated[0], brightCalibrated[1], numBCImages)
+    contrastParams = np.random.uniform(contrastCalibrated[0], contrastCalibrated[1], numBCImages)
 
     """ Execute the Resize test """
     print("\n\nExecute the Resize test:")
@@ -323,8 +337,15 @@ if __name__ == "__main__":
     for i in range(numResizedImages):
         fakeList = []
         fakeList.append(imageSetResize[i].reshape(28, 28))
+        # plt.imshow(imageSetResize[i].reshape(28, 28), cmap='Greys')
+        # plt.show()
         newImage = generator.addNoise(fakeList, resizeParams[i], 0, 0, 0)
         newImagesList.append(newImage)
+        # print("Resize " + str(i))
+        # print(newImage[0].shape)
+        # print(newImage[0].dtype)
+        # plt.imshow(newImage[0], cmap='Greys')
+        # plt.show()
     imageSetArray = np.asarray(newImagesList)
     resultKNN = refMod.discriminateKNN28x28(imageSetArray)
     resultSVM = refMod.discriminateSVM28x28(imageSetArray)
@@ -333,14 +354,18 @@ if __name__ == "__main__":
     resultSVM = np.uint8(resultSVM.reshape(numResizedImages))
 
     print("Accuracy for Resize test in OpenCV KNN:")
-    boolMask = resultKNN == labelsRotate
+    boolMask = resultKNN == labelsResize
     correct = np.count_nonzero(boolMask)
     print(correct * 100.0 / numResizedImages)
 
     print("Accuracy for Resize test in OpenCV SVM:")
-    boolMask = resultSVM == labelsRotate
+    boolMask = resultSVM == labelsResize
     correct = np.count_nonzero(boolMask)
     print(correct * 100.0 / numResizedImages)
+
+    if (showParams):
+        print("With calibrated params:")
+        print(resizeParams)
 
 
     """ Execute the Rotate test """
@@ -370,9 +395,80 @@ if __name__ == "__main__":
     # print(resultSVM)
     # print(labelsRotate)
     # print(boolMask)
+    if (showParams):
+        print("With calibrated params:")
+        print(rotateParams)
 
 
 
+    """ Execute the Brightness and Contrast test """
+    print("\n\nExecute the Brightness and Contrast test:")
+    newImagesList = []
+    for i in range(numBCImages):
+        fakeList = []
+        fakeList.append(imageSetBC[i].reshape(28, 28))
+        newImage = generator.addNoise(fakeList, 0, 0, brightnessParams[i], contrastParams[i])
+        newImagesList.append(newImage)
+    bcSetArray = np.asarray(newImagesList)
+    resultKNN = refMod.discriminateKNN28x28(bcSetArray)
+    resultSVM = refMod.discriminateSVM28x28(bcSetArray)
+
+    resultKNN = np.uint8(resultKNN.reshape(numBCImages))
+    resultSVM = np.uint8(resultSVM.reshape(numBCImages))
+
+    print("Accuracy for Brightness and Contrast test in OpenCV KNN:")
+    boolMask = resultKNN == labelsBC
+    correct = np.count_nonzero(boolMask)
+    print(correct * 100.0 / numBCImages)
+
+    print("Accuracy for Brightness and Contrast test in OpenCV SVM:")
+    boolMask = resultSVM == labelsBC
+    correct = np.count_nonzero(boolMask)
+    print(correct * 100.0 / numBCImages)
+    # print(resultSVM)
+    # print(labelsRotate)
+    # print(boolMask)
+    if (showParams):
+        print("With calibrated params:")
+        print(brightnessParams)
+        print(contrastParams)
+
+
+
+
+    """ Execute the Resize and Rotate test """
+    print("\n\nExecute the Resize and Rotate test:")
+    newImagesList = []
+    for i in range(numResizedRotatedImages):
+        fakeList = []
+        fakeList.append(imageSetRR[i].reshape(28, 28))
+        newImage = generator.addNoise(fakeList, resizeParams[i], rotateParams[i], 0, 0)
+        newImagesList.append(newImage)
+    rrSetArray = np.asarray(newImagesList)
+
+    # Discriminating
+    resultKNN = refMod.discriminateKNN28x28(rrSetArray)
+    resultSVM = refMod.discriminateSVM28x28(rrSetArray)
+
+    resultKNN = np.uint8(resultKNN.reshape(numResizedRotatedImages))
+    resultSVM = np.uint8(resultSVM.reshape(numResizedRotatedImages))
+
+    print("Accuracy for Resize and Rotate test in OpenCV KNN:")
+    boolMask = resultKNN == labelsRR
+    correct = np.count_nonzero(boolMask)
+    print(correct * 100.0 / numResizedRotatedImages)
+
+    print("Accuracy for Resize and Rotate test in OpenCV SVM:")
+    boolMask = resultSVM == labelsRR
+    correct = np.count_nonzero(boolMask)
+    print(correct * 100.0 / numResizedRotatedImages)
+    # print(resultSVM)
+    # print(labelsRotate)
+    # print(boolMask)
+    if (showParams):
+        print("With calibrated params:")
+        print(resizeParams)
+        print(rotateParams)
 
     # testSet28x28 = []
     # # Reshaping image set

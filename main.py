@@ -14,7 +14,7 @@ from ReferenceModelDriver import ReferenceModelDriver
 matplotlib.use('qt4agg')
 import matplotlib.pyplot as plt
 
-
+# 2018-03-22 17:42:26.700837: I tensorflow/core/platform/cpu_feature_guard.cc:137] Your CPU supports instructions that this TensorFlow binary was not compiled to use: SSE4.1 SSE4.2 AVX AVX2 FMA
 
 if __name__ == "__main__":
     generator = ig.ImageGenerator()
@@ -22,8 +22,11 @@ if __name__ == "__main__":
 
     numImages = 15
     # Receiving images in the shape 28x28 and 0to1 float format
-    subImages, reliability = generator.generateSubImage(numImages, 0, 0, reshape=True, convertUChar=False)
+    subImages, reliability = generator.generateSubImageWPrejudice(numImages, 0, 0, reshape=False, convertUChar=False)
     # subImages = generator.generateSubImage(numImages, 0, 0)
+
+    print(subImages.size)
+    print(len(subImages))
 
     resultKNN = refMod.discriminateKNN28x28(np.asarray(subImages))
 
@@ -41,33 +44,42 @@ if __name__ == "__main__":
     print(reliability)
     print("   -----   \n\n")
 
+
+    # resultCNNGen, rVals = generator.cnnDiscriminator(np.asarray(subImages).reshape(-1, 784))
+    resultCNNGen, rVals = generator.cnnDiscriminator(subImages)
+
+    print("CNNGen result:")
+    # print(resultCNNGen)
+    for i in range(len(resultCNNGen)):
+        print("Class: "+str(resultCNNGen[i])+" - R: "+str(np.amax(rVals[i])))
+    print("   -----   \n\n")
+
     subImagesFlat = []
     subImagesUint8 = []
 
     # Iterating the generated images to aply reference model.
-    for i in range(numImages):
+    for i in range(len(subImages)):
         # print("newImg.shape-size")
         # print(subImages[i].shape)
         # print(subImages[i].dtype)
         # print(subImages[i][10])
 
-
         # Preparing to aply these images on the full image generator. Converting to uint8.
         subImagesUint8.append(img_as_ubyte(subImages[i]))
 
-        print(subImages[i].dtype)
-        print(type(subImages[i]))
+        # print(subImages[i].dtype)
+        # print(type(subImages[i]))
         # print("Discriminator says:")
         # print(generator.discriminate([subImages[i].reshape(784)]))
         # subImagesFlat.append(subImages[i].reshape(784))
         # print(refMod.discriminate(subImages[i]))
         #     Tratando as imagens
         # newImg = cv2.resize(subImages[i], (20, 20)).reshape(400)
-
-        plt.imshow(subImages[i], cmap='Greys')
+        imgTemp = subImages[i].reshape(28, 28)
+        plt.imshow(imgTemp, cmap='Greys')
         plt.show()
 
-        cv2.imwrite("syn-img/"+str(i).zfill(3)+"_"+str(reliability[i])+" "+str(resultSVM[i])+"-"+str(resultKNN[i])+".png", img_as_ubyte(subImages[i]))
+        cv2.imwrite("syn-img/"+str(i).zfill(3)+"_P_"+str(np.amax(rVals[i]))+"_"+str(resultCNNGen[i])+"-"+str(resultSVM[i][0])+".png", img_as_ubyte(imgTemp))
         # The RefMod is waiting for 20
         # newImg = cv2.resize(newImg, (20, 20))
         # print("newImg.shape-size")
@@ -91,6 +103,7 @@ if __name__ == "__main__":
     # subImagesFlat = np.asarray(subImagesFlat)
     # print("subImagesFlat.dtype")
     # print(subImagesFlat.dtype)
+    print("Encerrando...")
     exit(0)
 
     siarray = np.asarray(subImagesUint8)
@@ -117,7 +130,7 @@ if __name__ == "__main__":
     """Prepare subImages adding more noise."""
     subImagesUint8 = generator.addNoise(siarray, 0, 35, 0, 0)
 
-    resultRM = refMod.discriminateKNN28x28(siarray, uintType=True)
+    resultRM = refMod.discriminateSVM28x28(siarray, uintType=True)
 
     print("refMod result:")
     print(resultRM)

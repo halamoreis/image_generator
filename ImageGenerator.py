@@ -20,6 +20,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 class ImageGenerator:
     # Default values
     MNIST_DIR = "./MNIST_data/"
+    CNN_MODEL_DIR = 'models/cnn-model-5000.ckpt'
     TRAINED_MODEL_DIR = "/home/hlm/workspace/python/DL/TF/models/500_epoch_model.ckpt"
     resolution = 28
     dataset = "MNIST"
@@ -51,7 +52,7 @@ class ImageGenerator:
       """
 
     kernelBright_code = """
-      __global__ void printPart(unsigned char *bg, unsigned char *part, long int *offsets, unsigned char *lineSize)
+      __global__ void printPart(unsigned char *img, unsigned char *bc, long int *offsets, unsigned char *lineSize)
       {
             int imgOffset = 100, indexOffset = 28*28;
                                                 // Number of offsets
@@ -63,13 +64,6 @@ class ImageGenerator:
             valPart != 0 ? bg[id*3] = (bg[id] * 0.3) + (valPart * 0.7) + 0: 0;
             valPart != 0 ? bg[(id*3)+1] = (bg[id] * 0.3) + (valPart * 0.7) + 0: 0;
             valPart != 0 ? bg[(id*3)+2] = (bg[id] * 0.3) + (valPart * 0.7) + 0: 0;
-
-
-
-
-            // bg[id] = blockDim.x-15;
-            //bg[id] = threadIdx.x + (threadIdx.y * blockDim.y);
-            //part[id] = blockDim.y;
       }
       """
 
@@ -111,7 +105,91 @@ class ImageGenerator:
         print([v.name for v in d_vars])
         print([v.name for v in g_vars])
         # TF Session
-        self.saver = tf.train.Saver(var_list=g_vars)
+        self.generatorSaver = tf.train.Saver(var_list=g_vars)
+        # self.dGeneratorSaver = tf.train.Saver(var_list=d_vars)
+
+        """ The CNN Discriminator """
+        print("Initializing the CNN Discriminator")
+
+
+
+
+    def cnnDiscriminator(self, input):
+        tf.reset_default_graph()
+
+        self.mnist = input_data.read_data_sets(self.MNIST_DIR, one_hot=True)
+
+
+
+        def init_weights(shape):
+            init_random_dist = tf.truncated_normal(shape, stddev=0.1)
+            return tf.Variable(init_random_dist)
+
+        def init_bias(shape):
+            init_bias_vals = tf.constant(0.1, shape=shape)
+            return tf.Variable(init_bias_vals)
+
+        def conv2d(x, W):
+            return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+
+        def max_pool_2by2(x):
+            return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
+                                  strides=[1, 2, 2, 1], padding='SAME')
+
+        """Using the conv2d function, we'll return an actual convolutional layer here that uses an ReLu activation."""
+        def convolutional_layer(input_x, shape):
+            W = init_weights(shape)
+            b = init_bias([shape[3]])
+            return tf.nn.relu(conv2d(input_x, W) + b)
+
+        """This is a normal fully connected layer"""
+        def normal_full_layer(input_layer, size):
+            input_size = int(input_layer.get_shape()[1])
+            W = init_weights([input_size, size])
+            b = init_bias([size])
+            return tf.matmul(input_layer, W) + b
+
+        ### Placeholders
+        self.cnnX = tf.placeholder(tf.float32, shape=[None, 784])
+        y_true = tf.placeholder(tf.float32, shape=[None, 10])
+
+        ### Creating the Layers
+        x_image = tf.reshape(self.cnnX, [-1, 28, 28, 1])
+
+        convo_1 = convolutional_layer(x_image, shape=[6, 6, 1, 32])
+        convo_1_pooling = max_pool_2by2(convo_1)
+        convo_2 = convolutional_layer(convo_1_pooling, shape=[6, 6, 32, 64])
+        convo_2_pooling = max_pool_2by2(convo_2)
+        convo_2_flat = tf.reshape(convo_2_pooling, [-1, 7 * 7 * 64])
+        full_layer_one = tf.nn.relu(normal_full_layer(convo_2_flat, 1024))
+
+        # NOTE THE PLACEHOLDER HERE!
+        self.hold_prob = tf.placeholder(tf.float32)
+        full_one_dropout = tf.nn.dropout(full_layer_one, keep_prob=self.hold_prob)
+
+        self.y_pred = normal_full_layer(full_one_dropout, 10)
+
+        ### Loss Function
+        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_true, logits=self.y_pred))
+
+        ### Optimizer
+        optimizer = tf.train.AdamOptimizer(learning_rate=0.0001)
+        train = optimizer.minimize(cross_entropy)
+
+        ### Saver
+        self.CNNSaver = tf.train.Saver()
+
+        init = tf.global_variables_initializer()
+
+        with tf.Session() as sess:
+            sess.run(init)
+            # Restoring the session
+            self.CNNSaver.restore(sess, self.CNN_MODEL_DIR)
+            result = sess.run(self.y_pred, feed_dict={self.cnnX: input, self.hold_prob: 1.0})
+            max = sess.run(tf.argmax(result, 1))
+
+        # Returnin the classification and the calculated score.
+        return max, result
 
 
     def __innerSubGenerator(self, z, reuse=None):
@@ -151,7 +229,7 @@ class ImageGenerator:
         image_ph = tf.placeholder(tf.float32, shape=[None, 784])
         init = tf.global_variables_initializer()
         with tf.Session() as sess:
-            self.saver.restore(sess, self.TRAINED_MODEL_DIR)
+            self.dGeneratorSaver.restore(sess, self.TRAINED_MODEL_DIR)
 
             sess.run(init)
             result, logits = sess.run(self.__innerDiscriminator(image_ph, reuse=tf.AUTO_REUSE), feed_dict={image_ph: images})
@@ -212,7 +290,7 @@ class ImageGenerator:
         init = tf.global_variables_initializer()
 
         with tf.Session() as sess:
-            self.saver.restore(sess, self.TRAINED_MODEL_DIR)
+            self.generatorSaver.restore(sess, self.TRAINED_MODEL_DIR)
 
             for x in range(numImages):
                 sample_z = np.random.uniform(-1, 1, size=(1, 100))
@@ -248,6 +326,108 @@ class ImageGenerator:
 
             # result, logits = sess.run(self.__innerDiscriminator(new_samples, reuse=True), feed_dict={image_ph: images})
         return new_samples, gen_reliability
+
+    """ Same as in the generateSubImage method but computing a score to the generated image and passing a boundary value
+        comparing to the given score.
+        
+    """
+    def generateSubImageWPrejudice(self, numImages, resolutionSubImage, imageType, reshape=True, convertUChar=True):
+        # Boundary value for prejudice
+        prejudiceLimit = 20
+
+
+        # Try to generate 50% more images than requested, to then select the high scored images.
+        numReqImages = numImages
+        numImages = int(numImages*1.5)
+
+        # Selecting the resolution index, 20x20, 28x28, 32x32 and 48x48.
+        if (resolutionSubImage == 0):
+            self.resolution = 20
+        elif (resolutionSubImage == 1):
+            self.resolution = 28
+        elif (resolutionSubImage == 2):
+            self.resolution = 32
+        elif (resolutionSubImage == 3):
+            self.resolution = 48
+
+        # Selecting the type of the primary image dataset.
+        if (imageType == 0):
+            dataset = "MNIST"
+        elif (imageType == 1):
+            dataset = "NIST"
+        elif (imageType == 2):
+            dataset = "CIFAR-10"
+
+        new_samples = []
+
+        # Creating the TF placeholder
+        z = tf.placeholder(tf.float32, shape=[None, 100])
+        # ipt = tf.placeholder(tf.float32, shape=[None, 784])
+        # image_ph = tf.placeholder(tf.float32, shape=[None, 784])
+
+        # init = tf.global_variables_initializer()
+
+        with tf.Session() as sess:
+            self.generatorSaver.restore(sess, self.TRAINED_MODEL_DIR)
+            wastedImages = 0
+
+            for x in range(numImages):
+                sample_z = np.random.uniform(-1, 1, size=(1, 100))
+
+                gen_sample = sess.run(self.__innerSubGenerator(z, reuse=True), feed_dict={z: sample_z})
+                # if( reshape ):
+                #     gen_sample = gen_sample.reshape(28, 28)
+                # if (convertUChar):
+                #     gen_sample = img_as_ubyte(gen_sample)
+                # print("Shape gen_sample")
+                # print(gen_sample.shape)
+                new_samples.append(gen_sample.reshape(784))
+            print("\n\n")
+
+            # sess.run(init)
+            # Getting the reliability
+            # gen_reliability, dis_logits = sess.run(self.__innerDiscriminator(image_ph, reuse=tf.AUTO_REUSE),
+            #                                        feed_dict={image_ph: np.asarray(new_samples).reshape([-1, 784])})
+
+            # result, logits = sess.run(self.__innerDiscriminator(new_samples, reuse=True), feed_dict={image_ph: images})
+        # return new_samples, gen_reliability
+
+        """ Get the score for each generated image to calculate the prejudice."""
+        classif, score = self.cnnDiscriminator(np.asarray(new_samples).reshape(numImages, 784))
+        # print(score.shape)
+        # print(len(score))
+        # print(score)
+        #
+        # new_samples = new_samples.reshape(len(new_samples), 784)
+        selectedSamples = []
+        for i in range(numImages):
+            if(np.amax(score[i]) > prejudiceLimit):
+                selectedSamples.append(new_samples[i])
+                # print("Appending...")
+                # print(type(new_samples[i]))
+                # print(new_samples[i].shape)
+        #
+        # objectsToRemove = []
+        #
+        # for i in range(numImages):
+        #     if(np.amax(score[i]) < prejudiceLimit):
+        #         objectsToRemove.append(new_samples[i])
+        #         print("Appending...")
+        #         print(type(new_samples[i]))
+        #         print(new_samples[i].shape)
+        #
+        # # Removing the objects
+        # for obj in objectsToRemove:
+        #     print("Removing...")
+        #     print(type(obj.all()))
+        #     print(obj.shape)
+        #     new_samples.remove(obj.all())
+
+        selectedSamples = np.asarray(selectedSamples)
+        if (reshape):
+            selectedSamples = selectedSamples.reshape(len(selectedSamples), 784)
+
+        return selectedSamples, score
 
     """Receiving a list of (sub)images, with each in the 28x28 shape and in uint8 format."""
     def generateFullImage(self, subImages, bgImage):

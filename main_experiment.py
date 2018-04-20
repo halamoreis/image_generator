@@ -25,7 +25,7 @@ if __name__ == "__main__":
     refMod = ReferenceModelDriver()
 
     # numImages = 50
-    numCalibrationImages = 100
+    numCalibrationImages = 30
     # Receiving images in the shape 28x28 and 0to1 float format
     # subImages = generator.generateSubImage(numImages, 0, 0, reshape=True, convertUChar=False)
 
@@ -120,8 +120,8 @@ if __name__ == "__main__":
 
     """ Initial boundaries values """
 
-    resizeIni = (-0.3, 0.6)
-    rotateIni = (5, 60)
+    resizeIni = (-0.3, 0.8)
+    rotateIni = (5, 55)
     brightnessIni = (-100, 70)
     contrastIni = (1.1, 3)
 
@@ -163,11 +163,17 @@ if __name__ == "__main__":
 
     boolMask = resultSVM == calibrateSetLabels
     correct = np.count_nonzero(boolMask)
+    print("Accuracy for Resize Calibration Set")
+    print(correct * 100.0 / numCalibrationImages)
+    print(boolMask)
+
 
     newMin = resizeIni[0]
     newMax = resizeIni[1]
     searchingMin = True
     searchingMax = False
+    tolerance = int(numCalibrationImages * 0.08) - 1
+    print("Tolerance: " + str(tolerance))
     for i in range(numCalibrationImages):
         if(boolMask[i]):
             if(searchingMin):
@@ -176,12 +182,25 @@ if __name__ == "__main__":
                 searchingMax = True
             elif(searchingMax):
                 newMax = resizeParams[i]
+        elif (searchingMax):
+            if (tolerance > 0):
+                tolerance -= 1
+            else:
+                newMax = resizeParams[i-2]
+                break
 
     # Update the new calibrated boundaries
     resizeCalibrated = (newMin, newMax)
     if (showParams):
+        print("Results:")
+        print(boolMask)
+        print(resizeParams)
         print("New boundaries for resize:")
         print(resizeCalibrated)
+    # exit(0)
+
+
+
 
     print("\n\nCalibrating rotate param...")
     # Calibrating resize params
@@ -207,11 +226,15 @@ if __name__ == "__main__":
 
     boolMask = resultSVM == calibrateSetLabels
     correct = np.count_nonzero(boolMask)
+    print("Accuracy for Rotate Calibration Set")
+    print(correct * 100.0 / numCalibrationImages)
+    print(boolMask)
 
     newMin = rotateIni[0]
     newMax = rotateIni[1]
     searchingMin = True
     searchingMax = False
+    tolerance = int(numCalibrationImages * 0.08) - 1
     for i in range(numCalibrationImages):
         if (boolMask[i]):
             if (searchingMin):
@@ -220,6 +243,13 @@ if __name__ == "__main__":
                 searchingMax = True
             elif (searchingMax):
                 newMax = rotateParams[i]
+        elif (searchingMax):
+            if (tolerance > 0):
+                tolerance -= 1
+            else:
+                newMax = rotateParams[i - 2]
+                break
+
 
     # Update the new calibrated boundaries
     rotateCalibrated = (newMin, newMax)
@@ -252,8 +282,10 @@ if __name__ == "__main__":
 
     boolMask = resultSVM == calibrateSetLabels
     correct = np.count_nonzero(boolMask)
-    # print(boolMask)
+
+    print("Accuracy for B&C Calibration Set")
     print(correct * 100.0 / numCalibrationImages)
+    print(boolMask)
 
     newMinb = brightnessIni[0]
     newMinc = contrastIni[0]
@@ -261,6 +293,7 @@ if __name__ == "__main__":
     newMaxc = contrastIni[1]
     searchingMin = True
     searchingMax = False
+    tolerance = int(numCalibrationImages * 0.08) - 1
     for i in range(numCalibrationImages):
         if (boolMask[i]):
             if (searchingMin):
@@ -271,6 +304,13 @@ if __name__ == "__main__":
             elif (searchingMax):
                 newMaxb = brightnessParams[i]
                 newMaxc = contrastParams[i]
+        elif (searchingMax):
+            if (tolerance > 0):
+                tolerance -= 1
+            else:
+                newMax = brightnessParams[i - 2]
+                newMax = contrastParams[i - 2]
+                break
 
     # Update the new calibrated boundaries
     brightCalibrated = (newMinb, newMaxb)
@@ -295,7 +335,7 @@ if __name__ == "__main__":
     """"""
 
     # Getting the image test set and the corresponding labels
-    numTestImages = 2500
+    numTestImages = 10000
     numResizedImages = int(numTestImages / 4)
     numRotatedImages = int(numTestImages / 4)
     numBCImages = int(numTestImages / 4)

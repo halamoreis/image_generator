@@ -11,6 +11,7 @@ import pycuda.autoinit
 
 import numpy as np
 import cv2 as cv
+import math
 
 from skimage import img_as_ubyte
 from skimage import img_as_float
@@ -51,8 +52,135 @@ class ImageGenerator:
       }
       """
 
-    kernelBright_code = """
-      __global__ void printPart(unsigned char *img, unsigned char *bc, long int *offsets, unsigned char *lineSize)
+    simple_kernel_noise_code = """
+    __global__ void addNoise(unsigned char *images, int *bright, float *contrast)
+    {
+            //Image size 28*28 = 784
+            int indexOffset = 784;
+            
+            // Number of offsets
+            //int offsetx = offsets[blockIdx.x];
+            //int offsety = offsets[blockIdx.x + 4];
+            
+            //Rotating the destination cordinates
+            
+            
+            //The index of the current pixel
+            int pxIndex = (threadIdx.x + threadIdx.y * blockDim.y) + (indexOffset * blockIdx.x);
+                        
+            int pxVal = images[pxIndex];
+            
+            //Apply B & C
+            pxVal = (int) (pxVal + bright[blockIdx.x]) * contrast[blockIdx.x];
+            images[pxIndex] = pxVal > 255 ? 255 : pxVal;
+    }
+    """
+
+    kernel_rotate_code = """
+        __global__ void addNoise(unsigned char *images, unsigned char *outputImages, float *sin, float *cos
+        , int *bright, float *contrast)
+        {
+                int hwidth = 14;
+                int hheight = 14;
+                int x = threadIdx.x;
+                int y = threadIdx.y;
+                
+                int xt = x - hwidth;
+                int yt = y - hheight;
+                
+                // float angle = rotateAngle[blockIdx.x];
+                
+                //double sinma = sin(-angle/2);
+                //double cosma = cos(-angle/2);
+                float sinma = sin[blockIdx.x];
+                float cosma = cos[blockIdx.x];
+                
+                    
+                
+                int xs = (int)round((cosma * xt - sinma * yt) + hwidth);
+                int ys = (int)round((sinma * xt + cosma * yt) + hheight);
+
+                int indexOffset = 784;        
+        
+                if(xs >= 0 && xs < 28 && ys >= 0 && ys < 28) {
+                    /* set target pixel (x,y) to color at (xs,ys) */
+                    int pxIndex = (threadIdx.x + threadIdx.y * blockDim.y) + (indexOffset * blockIdx.x);
+                    int newIndex = (xs + ys * blockDim.y) + (indexOffset * blockIdx.x);
+                    
+                    outputImages[newIndex] = images[pxIndex];
+                } else {
+                    /* set target pixel (x,y) to some default background */
+                    int pxIndex = (threadIdx.x + threadIdx.y * blockDim.y) + (indexOffset * blockIdx.x);
+                    /*
+                    if(x == 0 && y ==0)
+                        outputImages[pxIndex] = angle;
+                    else*/
+                        outputImages[pxIndex] = 0;
+                }
+                
+        }
+        """
+
+    kernel_noise_code = """
+      __global__ void addNoise(unsigned char *images, float *rotateAngle
+      , int *bright, float *contrast)
+      {
+            //Image size 28*28 = 784
+            int indexOffset = 784;
+            
+            // Number of offsets
+            //int offsetx = offsets[blockIdx.x];
+            //int offsety = offsets[blockIdx.x + 4];
+            
+            //Rotating the destination cordinates
+            //width / 2 -> 28/2 = 14
+            //int hwidth = 14;
+            //int hheight = 14;
+            
+            //x = threadIdx.x && y = threadIdx.y
+            int xt = threadIdx.x - 14;
+            int yt = threadIdx.y - 14;
+            
+            float angle = rotateAngle[blockIdx.x];
+            
+            float sinma = sin(-angle);
+            float cosma = cos(-angle);
+            
+            int xs = (int)round((cosma * xt - sinma * yt) + 14);
+            int ys = (int)round((sinma * xt + cosma * yt) + 14);
+            
+            //ID of the current image
+            //int bgId = (threadIdx.x + offsetx) + ((threadIdx.y+offsety) * 1024);
+            
+            //The index of the current pixel
+            //int pxIndex = (threadIdx.x + threadIdx.y * blockDim.y) + (indexOffset * blockIdx.x);
+            int pxIndex;
+            //int img = images[(threadIdx.x + threadIdx.y * blockDim.y) + (indexOffset * blockIdx.x)];
+            int pxVal = images[pxIndex];
+            
+            //Apply B & C
+            int newVal = (pxVal * contrast[blockIdx.x]) + bright[blockIdx.x];
+            int blankVal = 0;
+
+            //images[pxIndex] = (unsigned char) (pxVal + bright[blockIdx.x]) * contrast[blockIdx.x];
+            
+            //Writing to...
+            if(xs >= 0 && xs < 28 && ys >= 0 && ys < 28) {
+                pxIndex = (xs + ys * blockDim.y) + (indexOffset * blockIdx.x);
+                images[pxIndex] = newVal;
+            } else {
+                pxIndex = (threadIdx.x + threadIdx.y * blockDim.y) + (indexOffset * blockIdx.x);
+                images[pxIndex] = blankVal;
+            }
+            
+            //images[pxIndex] = newVal > 255 ? 255 : newVal;
+            //images[pxIndex] += 100;
+
+      }
+      """
+    # Test
+
+    """ __global__ void addNoise(unsigned char *img, unsigned char *bc, long int *offsets, unsigned char *lineSize)
       {
             int imgOffset = 100, indexOffset = 28*28;
                                                 // Number of offsets
@@ -117,7 +245,7 @@ class ImageGenerator:
     def cnnDiscriminator(self, input):
         tf.reset_default_graph()
 
-        self.mnist = input_data.read_data_sets(self.MNIST_DIR, one_hot=True)
+        # self.mnist = input_data.read_data_sets(self.MNIST_DIR, one_hot=True)
 
 
 
@@ -331,9 +459,9 @@ class ImageGenerator:
         comparing to the given score.
         
     """
-    def generateSubImageWPrejudice(self, numImages, resolutionSubImage, imageType, reshape=True, convertUChar=True):
+    def generateSubImageWPrejudice(self, numImages, resolutionSubImage, imageType, reshape=True, convertUChar=True, prejudiceLimit = 20):
         # Boundary value for prejudice
-        prejudiceLimit = 20
+
 
 
         # Try to generate 50% more images than requested, to then select the high scored images.
@@ -484,6 +612,85 @@ class ImageGenerator:
         return completeImage_host
 
 
+    """Receiving a list of (sub)images, with each in the 28x28 shape and in uint8 format."""
+    # def addNoiseGPU(self, subImages, bgImage):
+    def addNoiseGPU(self, images, resize, rotate, brightness, contrast):
+        numImages = len(images)
+
+        # TODO Check if necessary to reshape and to convert the subImages.
+        # Reshaping the subImages
+        # for i in range(0, numSubImages):
+        #     listaImagens.append(img_as_ubyte(mnist.train.images[i].reshape(28, 28)))
+
+        """Preparing PyCUDA setup."""
+        # cudaDeformationProgram = SourceModule(self.kernel_noise_code)
+        cudaDeformationProgram = SourceModule(self.simple_kernel_noise_code)
+        cudaRotationProgram = SourceModule(self.kernel_rotate_code)
+
+        # TODO Check if is really necessary convert to a numpy array.
+        # Convert the python list to numpy array
+        # npArrayImages = np.asarray(subImages)
+
+        # print rotate
+
+        # Calculate the sine an cosine
+        # sin = np.float32(np.apply_along_axis(math.sin, 0, rotate))
+        sin = np.asarray(map(math.sin, rotate), dtype=np.float32)
+        cos = np.asarray(map(math.cos, rotate), dtype=np.float32)
+        # cos = np.float32(np.apply_along_axis(math.cos, 0, rotate))
+
+        # print("Senos:")
+        # print(sin)
+
+        """ Preparing the parameters to send to the GPU """
+        rotateAngle = np.zeros(numImages, np.float)
+
+        # Test the type of the params
+
+        # Allocating GPU memory
+        images_gpu = cuda.mem_alloc(images.nbytes)
+        outputImages_gpu = cuda.mem_alloc(images.nbytes)
+        sin_gpu = cuda.mem_alloc(sin.nbytes)
+        cos_gpu = cuda.mem_alloc(cos.nbytes)
+        rotateAngle_gpu = cuda.mem_alloc(rotate.nbytes)
+        brightness_gpu = cuda.mem_alloc(brightness.nbytes)
+        contrast_gpu = cuda.mem_alloc(contrast.nbytes)
+
+        # Copying the HOST values to the GPU memory
+        cuda.memcpy_htod(images_gpu, images)
+        cuda.memcpy_htod(outputImages_gpu, images)
+        cuda.memcpy_htod(sin_gpu, sin)
+        cuda.memcpy_htod(cos_gpu, cos)
+        cuda.memcpy_htod(rotateAngle_gpu, rotate)
+        cuda.memcpy_htod(brightness_gpu, brightness)
+        cuda.memcpy_htod(contrast_gpu, contrast)
+
+        # TODO Calcular de acordo com a resolução do imgPart
+        totalThreadSize = 28 * 28
+        totalBlockSize = totalThreadSize
+        gridSize = totalThreadSize / totalBlockSize
+        # TODO Calcular de acordo com threadSize dinamicamente
+        blockSpec = (28, 28, 1)
+        gridSpec = (numImages, 1)
+
+        # Invoking kernel
+        kernelDefFunc = cudaDeformationProgram.get_function('addNoise')
+        kernelRotFunc = cudaRotationProgram.get_function('addNoise')
+        kernelDefFunc(images_gpu, brightness_gpu, contrast_gpu, block=blockSpec, grid=gridSpec)
+        kernelRotFunc(images_gpu, outputImages_gpu, sin_gpu, cos_gpu, brightness_gpu, contrast_gpu, block=blockSpec, grid=gridSpec)
+
+        # Var to receive from GPU the altered image
+        alteredImages = np.empty_like(images)
+
+        # cuda.memcpy_dtoh(alteredImages, images_gpu)
+        cuda.memcpy_dtoh(alteredImages, outputImages_gpu)
+
+        # print("Offsets:\n")
+        # print(offsetArray)
+
+        return alteredImages
+
+
     """Adiciona ruídos às imagens submetidas.
         Expects an image in a 2 dimensional array
         - resize = float value from -0.5 to 0.5
@@ -575,11 +782,11 @@ class ImageGenerator:
         - contrast = 
     """
     def addNoiseToLists(self, images, resizeParams, rotateParams, brightnessParams, contrastParams):
-        print("Resize: " + str(resizeParams[0]) + ", " + str(resizeParams[49]))
-        print("Rotate: " + str(rotateParams[0]) + ", " + str(rotateParams[49]))
-        print("Bright: " + str(brightnessParams[0]) + ", " + str(brightnessParams[49]))
-        print("Contrast: " + str(contrastParams[0]) + ", " + str(contrastParams[49]))
-        print("---------------------------------")
+        # print("Resize: " + str(resizeParams[0]) + ", " + str(resizeParams[49]))
+        # print("Rotate: " + str(rotateParams[0]) + ", " + str(rotateParams[49]))
+        # print("Bright: " + str(brightnessParams[0]) + ", " + str(brightnessParams[49]))
+        # print("Contrast: " + str(contrastParams[0]) + ", " + str(contrastParams[49]))
+        # print("---------------------------------")
         # First image as model for shape
         rows, cols = images[0].shape
 
@@ -668,7 +875,7 @@ class ImageGenerator:
                 # imgTemp = cv.add(imgTemp, brightnessParams[i])
                 imgTemp = cv.add(images[i], brightnessParams[i])
                 # images[i] = img_as_float(cv.multiply(imgTemp, contrastParams[i]))
-                images[i] = cv.multiply(imgTemp, contrastParams[i])
+                images[i] = cv.multiply(imgTemp, np.float64(contrastParams[i]))
 
                 # print("Post processing")
                 # print(images[0][18])
